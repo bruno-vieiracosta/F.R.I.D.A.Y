@@ -93,3 +93,14 @@ def test_initial_migration_contains_only_technical_schema() -> None:
     assert "application_metadata" in migration
     for forbidden_term in FORBIDDEN_MIGRATION_TERMS:
         assert forbidden_term not in migration
+
+
+@pytest.mark.architecture
+def test_technical_audit_migration_contains_only_technical_schema() -> None:
+    migration = Path("alembic/versions/0002_technical_audit.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "technical_audit_records" in migration
+    for forbidden_term in FORBIDDEN_MIGRATION_TERMS:
+        assert forbidden_term not in migration

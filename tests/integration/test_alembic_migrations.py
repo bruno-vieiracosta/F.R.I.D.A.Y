@@ -54,6 +54,7 @@ def test_alembic_upgrade_creates_initial_technical_table(
 
     table_names = _table_names(_engine(settings))
     assert "application_metadata" in table_names
+    assert "technical_audit_records" in table_names
     assert "alembic_version" in table_names
 
 

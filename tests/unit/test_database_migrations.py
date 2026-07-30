@@ -12,9 +12,11 @@ from friday.infrastructure.persistence import (
     application_metadata,
     create_alembic_config,
     schema_metadata,
+    technical_audit_records,
 )
 
-REVISION_PATH = Path("alembic/versions/0001_initial_revision.py")
+INITIAL_REVISION_PATH = Path("alembic/versions/0001_initial_revision.py")
+AUDIT_REVISION_PATH = Path("alembic/versions/0002_technical_audit.py")
 
 
 def _settings(temporary_directory: Path) -> ApplicationSettings:
@@ -29,10 +31,10 @@ def _settings(temporary_directory: Path) -> ApplicationSettings:
     )
 
 
-def _load_revision_module() -> ModuleType:
+def _load_revision_module(path: Path, module_name: str) -> ModuleType:
     spec = importlib.util.spec_from_file_location(
-        "initial_revision",
-        REVISION_PATH,
+        module_name,
+        path,
     )
     assert spec is not None
     assert spec.loader is not None
@@ -59,7 +61,11 @@ def test_alembic_config_uses_application_settings(
 def test_official_metadata_contains_only_technical_table() -> None:
     assert isinstance(schema_metadata, MetaData)
     assert schema_metadata is application_metadata.metadata
-    assert set(schema_metadata.tables) == {"application_metadata"}
+    assert schema_metadata is technical_audit_records.metadata
+    assert set(schema_metadata.tables) == {
+        "application_metadata",
+        "technical_audit_records",
+    }
 
 
 @pytest.mark.unit
@@ -68,7 +74,7 @@ def test_initial_revision_exists_and_is_registered() -> None:
         create_alembic_config(load_settings({}))
     )
 
-    revision = script_directory.get_revision("head")
+    revision = script_directory.get_revision("0001_initial_revision")
 
     assert revision is not None
     assert revision.revision == "0001_initial_revision"
@@ -77,9 +83,32 @@ def test_initial_revision_exists_and_is_registered() -> None:
 
 @pytest.mark.unit
 def test_initial_revision_exposes_upgrade_and_downgrade() -> None:
-    module = _load_revision_module()
+    module = _load_revision_module(INITIAL_REVISION_PATH, "initial_revision")
 
     assert module.revision == "0001_initial_revision"
     assert module.down_revision is None
+    assert callable(module.upgrade)
+    assert callable(module.downgrade)
+
+
+@pytest.mark.unit
+def test_technical_audit_revision_is_current_head() -> None:
+    script_directory = ScriptDirectory.from_config(
+        create_alembic_config(load_settings({}))
+    )
+
+    revision = script_directory.get_revision("head")
+
+    assert revision is not None
+    assert revision.revision == "0002_technical_audit"
+    assert revision.down_revision == "0001_initial_revision"
+
+
+@pytest.mark.unit
+def test_technical_audit_revision_exposes_upgrade_and_downgrade() -> None:
+    module = _load_revision_module(AUDIT_REVISION_PATH, "technical_audit_revision")
+
+    assert module.revision == "0002_technical_audit"
+    assert module.down_revision == "0001_initial_revision"
     assert callable(module.upgrade)
     assert callable(module.downgrade)

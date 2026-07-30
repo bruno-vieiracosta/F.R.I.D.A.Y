@@ -64,7 +64,7 @@ class ApplicationEvent:
     def name(self) -> str:
         return self.event_name
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "event_id": str(self.event_id),
             "event_name": self.name,

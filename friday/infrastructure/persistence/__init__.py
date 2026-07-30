@@ -16,6 +16,7 @@ from friday.infrastructure.persistence.migrations import (
 from friday.infrastructure.persistence.schema import (
     application_metadata,
     schema_metadata,
+    technical_audit_records,
 )
 from friday.infrastructure.persistence.session import SqlAlchemySessionFactory
 from friday.infrastructure.persistence.unit_of_work import (
@@ -37,5 +38,6 @@ __all__ = [
     "initialize_database",
     "resolve_database_configuration",
     "schema_metadata",
+    "technical_audit_records",
     "upgrade_database",
 ]

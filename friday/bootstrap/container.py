@@ -12,6 +12,12 @@ from friday.application.event_bus import EventBus
 from friday.application.persistence.unit_of_work import UnitOfWork
 from friday.bootstrap.config import ApplicationSettings, load_settings
 from friday.bootstrap.logging import LoggerFactory, configure_logging
+from friday.infrastructure.audit import (
+    TechnicalAuditEvent,
+    TechnicalAuditEventHandler,
+    TechnicalAuditRepository,
+    TechnicalAuditService,
+)
 from friday.infrastructure.persistence import (
     DatabaseConfiguration,
     DatabaseInfrastructure,
@@ -151,7 +157,12 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
 
     def event_bus_factory(current_container: ServiceContainer) -> EventBus:
         factory = current_container.resolve(LoggerFactory)
-        return EventBus(logger=factory.get_logger("events"))
+        event_bus = EventBus(logger=factory.get_logger("events"))
+        event_bus.subscribe(
+            TechnicalAuditEvent,
+            current_container.resolve(TechnicalAuditEventHandler),
+        )
+        return event_bus
 
     def engine_factory(current_container: ServiceContainer) -> Engine:
         factory = current_container.resolve(SqlAlchemyEngineFactory)
@@ -179,6 +190,24 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
             configuration=configuration,
             engine=engine,
             session_factory=factory,
+        )
+
+    def audit_repository_factory(
+        current_container: ServiceContainer,
+    ) -> TechnicalAuditRepository:
+        return TechnicalAuditRepository(
+            session_factory=current_container.resolve(SqlAlchemySessionFactory),
+            logger=current_container.resolve(LoggerFactory).get_logger("audit"),
+        )
+
+    def audit_service_factory(
+        current_container: ServiceContainer,
+    ) -> TechnicalAuditService:
+        return TechnicalAuditService(
+            repository=current_container.resolve(TechnicalAuditRepository),
+            clock=cast(Clock, current_container.resolve(Clock)),
+            id_generator=cast(IdGenerator, current_container.resolve(IdGenerator)),
+            logger=current_container.resolve(LoggerFactory).get_logger("audit"),
         )
 
     container = ServiceContainer()
@@ -220,6 +249,23 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     container.register_factory(
         DatabaseInfrastructure,
         database_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        TechnicalAuditRepository,
+        audit_repository_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        TechnicalAuditService,
+        audit_service_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        TechnicalAuditEventHandler,
+        lambda current_container: TechnicalAuditEventHandler(
+            current_container.resolve(TechnicalAuditService),
+        ),
         lifetime=ServiceLifetime.SINGLETON,
     )
     container.register_factory(

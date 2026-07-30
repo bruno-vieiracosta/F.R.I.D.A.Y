@@ -73,6 +73,8 @@ A infraestrutura SQLite + SQLAlchemy esta documentada em `docs/development/datab
 
 As migracoes com Alembic estao documentadas em `docs/development/database_migrations.md`.
 
+A auditoria tecnica esta documentada em `docs/development/technical_audit.md`.
+
 ## Estrutura
 
 ```text
@@ -92,4 +94,4 @@ A finalidade de cada pacote esta documentada em `docs/architecture/package_struc
 
 ## Escopo atual
 
-Esta versao nao implementa regras de negocio, interface grafica, persistencia, IA ou integracoes externas.
+Esta versao nao implementa regras de negocio, interface grafica, persistencia de negocio, IA ou integracoes externas.
