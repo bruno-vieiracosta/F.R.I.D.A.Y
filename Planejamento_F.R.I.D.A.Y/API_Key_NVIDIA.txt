@@ -1,0 +1,5 @@
+API_Key_NVIDIA
+
+Name: FRIDAY
+API code: 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
+Expiration: 21/07/2027

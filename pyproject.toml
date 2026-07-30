@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "friday"
+version = "0.1.0"
+description = "Bootstrap inicial do projeto F.R.I.D.A.Y."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [
+    { name = "F.R.I.D.A.Y." }
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "build>=1.3",
+    "mypy>=2.3",
+    "pytest>=9.1",
+    "pytest-cov>=7.0",
+    "ruff>=0.15",
+]
+
+[tool.setuptools.packages.find]
+include = ["friday*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "-p",
+    "no:cacheprovider",
+]
+markers = [
+    "architecture: tests for architectural boundaries and package structure",
+    "integration: tests that exercise installed or cross-module behavior",
+    "slow: tests that are intentionally slower than the default suite",
+    "unit: fast tests for isolated modules and shared test utilities",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["friday"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+include = ["friday/**/*.py", "tests/**/*.py"]
+extend-exclude = ["pytest-cache-files-*"]
+
+[tool.ruff.format]
+docstring-code-format = true
+indent-style = "space"
+line-ending = "auto"
+quote-style = "double"
+
+[tool.ruff.lint]
+select = [
+    "B",
+    "C4",
+    "C90",
+    "E",
+    "F",
+    "I",
+    "RUF",
+    "SIM",
+    "UP",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["friday"]
+pretty = true
+show_error_codes = true
+warn_unreachable = true
