@@ -18,6 +18,11 @@ from friday.infrastructure.audit import (
     TechnicalAuditRepository,
     TechnicalAuditService,
 )
+from friday.infrastructure.backup import (
+    BackupConfiguration,
+    BackupService,
+    resolve_backup_configuration,
+)
 from friday.infrastructure.persistence import (
     DatabaseConfiguration,
     DatabaseInfrastructure,
@@ -210,6 +215,18 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
             logger=current_container.resolve(LoggerFactory).get_logger("audit"),
         )
 
+    def backup_service_factory(current_container: ServiceContainer) -> BackupService:
+        return BackupService(
+            settings=current_container.resolve(ApplicationSettings),
+            configuration=current_container.resolve(BackupConfiguration),
+            database=current_container.resolve(DatabaseInfrastructure),
+            clock=cast(Clock, current_container.resolve(Clock)),
+            id_generator=cast(IdGenerator, current_container.resolve(IdGenerator)),
+            logger=current_container.resolve(LoggerFactory).get_logger("backup"),
+            audit_service=current_container.resolve(TechnicalAuditService),
+            event_bus=current_container.resolve(EventBus),
+        )
+
     container = ServiceContainer()
     container.register_instance(ApplicationSettings, resolved_settings)
     container.register_instance(LoggerFactory, logger_factory)
@@ -222,6 +239,10 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     container.register_instance(
         DatabaseConfiguration,
         resolve_database_configuration(resolved_settings),
+    )
+    container.register_instance(
+        BackupConfiguration,
+        resolve_backup_configuration(resolved_settings),
     )
     container.register_factory(
         SqlAlchemyEngineFactory,
@@ -271,6 +292,11 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     container.register_factory(
         EventBus,
         event_bus_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        BackupService,
+        backup_service_factory,
         lifetime=ServiceLifetime.SINGLETON,
     )
     return container

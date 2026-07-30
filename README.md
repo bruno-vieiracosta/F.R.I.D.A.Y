@@ -75,6 +75,8 @@ As migracoes com Alembic estao documentadas em `docs/development/database_migrat
 
 A auditoria tecnica esta documentada em `docs/development/technical_audit.md`.
 
+A infraestrutura de backup esta documentada em `docs/development/backup_infrastructure.md`.
+
 ## Estrutura
 
 ```text
