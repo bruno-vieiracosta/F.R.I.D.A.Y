@@ -13,6 +13,7 @@ authors = [
     { name = "F.R.I.D.A.Y." }
 ]
 dependencies = [
+    "alembic>=1.13,<2.0",
     "SQLAlchemy>=2.0,<3.0",
 ]
 

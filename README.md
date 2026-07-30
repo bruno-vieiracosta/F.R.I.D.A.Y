@@ -71,6 +71,8 @@ Os contratos oficiais de persistência estão documentados em `docs/development/
 
 A infraestrutura SQLite + SQLAlchemy esta documentada em `docs/development/database_infrastructure.md`.
 
+As migracoes com Alembic estao documentadas em `docs/development/database_migrations.md`.
+
 ## Estrutura
 
 ```text

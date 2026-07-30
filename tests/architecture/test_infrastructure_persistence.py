@@ -15,10 +15,9 @@ FORBIDDEN_APPLICATION_IMPORTS = {
     "sqlalchemy",
     "friday.infrastructure",
 }
-FORBIDDEN_ORM_MARKERS = {
-    "Column",
-    "Mapped",
-    "Table",
+FORBIDDEN_ORM_MODEL_MARKERS = {
+    "DeclarativeBase",
+    "Mapped[",
     "declarative_base",
     "mapped_column",
 }
@@ -73,11 +72,11 @@ def test_application_remains_independent_from_database_technology() -> None:
 
 
 @pytest.mark.architecture
-def test_database_foundation_does_not_define_orm_models_or_tables() -> None:
+def test_database_foundation_does_not_define_orm_models() -> None:
     persistence_root = (
         Path(__file__).resolve().parents[2] / "friday" / "infrastructure"
     ) / "persistence"
     source = _source_from_files(persistence_root)
 
-    for marker in FORBIDDEN_ORM_MARKERS:
+    for marker in FORBIDDEN_ORM_MODEL_MARKERS:
         assert marker not in source

@@ -14,7 +14,10 @@ def test_runtime_dependencies_are_officially_declared() -> None:
     project = _pyproject()["project"]
 
     assert isinstance(project, dict)
-    assert project["dependencies"] == ["SQLAlchemy>=2.0,<3.0"]
+    assert project["dependencies"] == [
+        "alembic>=1.13,<2.0",
+        "SQLAlchemy>=2.0,<3.0",
+    ]
 
 
 @pytest.mark.unit

@@ -8,6 +8,15 @@ from friday.infrastructure.persistence.database import (
     initialize_database,
 )
 from friday.infrastructure.persistence.engine import SqlAlchemyEngineFactory
+from friday.infrastructure.persistence.migrations import (
+    create_alembic_config,
+    downgrade_database,
+    upgrade_database,
+)
+from friday.infrastructure.persistence.schema import (
+    application_metadata,
+    schema_metadata,
+)
 from friday.infrastructure.persistence.session import SqlAlchemySessionFactory
 from friday.infrastructure.persistence.unit_of_work import (
     SqlAlchemyTransaction,
@@ -21,7 +30,12 @@ __all__ = [
     "SqlAlchemySessionFactory",
     "SqlAlchemyTransaction",
     "SqlAlchemyUnitOfWork",
+    "application_metadata",
+    "create_alembic_config",
+    "downgrade_database",
     "ensure_database_directory",
     "initialize_database",
     "resolve_database_configuration",
+    "schema_metadata",
+    "upgrade_database",
 ]
