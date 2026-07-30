@@ -10,11 +10,11 @@ def _pyproject() -> dict[str, object]:
 
 
 @pytest.mark.unit
-def test_runtime_dependencies_remain_empty() -> None:
+def test_runtime_dependencies_are_officially_declared() -> None:
     project = _pyproject()["project"]
 
     assert isinstance(project, dict)
-    assert project["dependencies"] == []
+    assert project["dependencies"] == ["SQLAlchemy>=2.0,<3.0"]
 
 
 @pytest.mark.unit

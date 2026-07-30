@@ -12,7 +12,9 @@ license = "MIT"
 authors = [
     { name = "F.R.I.D.A.Y." }
 ]
-dependencies = []
+dependencies = [
+    "SQLAlchemy>=2.0,<3.0",
+]
 
 [project.optional-dependencies]
 dev = [

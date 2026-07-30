@@ -6,9 +6,20 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic, TypeVar, cast, overload
 
+from sqlalchemy.engine import Engine
+
 from friday.application.event_bus import EventBus
+from friday.application.persistence.unit_of_work import UnitOfWork
 from friday.bootstrap.config import ApplicationSettings, load_settings
 from friday.bootstrap.logging import LoggerFactory, configure_logging
+from friday.infrastructure.persistence import (
+    DatabaseConfiguration,
+    DatabaseInfrastructure,
+    SqlAlchemyEngineFactory,
+    SqlAlchemySessionFactory,
+    SqlAlchemyUnitOfWork,
+    resolve_database_configuration,
+)
 from friday.shared.clock import Clock, SystemClock
 from friday.shared.errors import ConfigurationError
 from friday.shared.identifiers import IdGenerator, UuidGenerator
@@ -142,6 +153,34 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         factory = current_container.resolve(LoggerFactory)
         return EventBus(logger=factory.get_logger("events"))
 
+    def engine_factory(current_container: ServiceContainer) -> Engine:
+        factory = current_container.resolve(SqlAlchemyEngineFactory)
+        return factory.create()
+
+    def session_factory(
+        current_container: ServiceContainer,
+    ) -> SqlAlchemySessionFactory:
+        engine = current_container.resolve(Engine)
+        return SqlAlchemySessionFactory.from_engine(engine)
+
+    def unit_of_work_factory(current_container: ServiceContainer) -> UnitOfWork:
+        factory = current_container.resolve(SqlAlchemySessionFactory)
+        return SqlAlchemyUnitOfWork(factory)
+
+    def database_factory(
+        current_container: ServiceContainer,
+    ) -> DatabaseInfrastructure:
+        configuration = current_container.resolve(DatabaseConfiguration)
+        engine = current_container.resolve(Engine)
+        factory = current_container.resolve(SqlAlchemySessionFactory)
+        logger = current_container.resolve(LoggerFactory).get_logger("database")
+        logger.info("Database infrastructure initialized")
+        return DatabaseInfrastructure(
+            configuration=configuration,
+            engine=engine,
+            session_factory=factory,
+        )
+
     container = ServiceContainer()
     container.register_instance(ApplicationSettings, resolved_settings)
     container.register_instance(LoggerFactory, logger_factory)
@@ -151,6 +190,38 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     )
     container.register_instance(Clock, SystemClock())
     container.register_instance(IdGenerator, UuidGenerator())
+    container.register_instance(
+        DatabaseConfiguration,
+        resolve_database_configuration(resolved_settings),
+    )
+    container.register_factory(
+        SqlAlchemyEngineFactory,
+        lambda current_container: SqlAlchemyEngineFactory(
+            configuration=current_container.resolve(DatabaseConfiguration),
+            logger=current_container.resolve(LoggerFactory).get_logger("database"),
+        ),
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        Engine,
+        engine_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        SqlAlchemySessionFactory,
+        session_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        UnitOfWork,
+        unit_of_work_factory,
+        lifetime=ServiceLifetime.TRANSIENT,
+    )
+    container.register_factory(
+        DatabaseInfrastructure,
+        database_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
     container.register_factory(
         EventBus,
         event_bus_factory,

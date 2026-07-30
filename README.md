@@ -69,6 +69,8 @@ O barramento de eventos internos esta documentado em `docs/development/event_bus
 
 Os contratos oficiais de persistência estão documentados em `docs/development/persistence_contracts.md`.
 
+A infraestrutura SQLite + SQLAlchemy esta documentada em `docs/development/database_infrastructure.md`.
+
 ## Estrutura
 
 ```text
