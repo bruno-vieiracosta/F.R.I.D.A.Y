@@ -65,6 +65,8 @@ Identificadores tipados e tempo estao documentados em `docs/development/identifi
 
 O container de dependencias esta documentado em `docs/development/dependency_injection.md`.
 
+O barramento de eventos internos esta documentado em `docs/development/event_bus.md`.
+
 ## Estrutura
 
 ```text

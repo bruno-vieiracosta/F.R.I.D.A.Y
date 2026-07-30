@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic, TypeVar, cast, overload
 
+from friday.application.event_bus import EventBus
 from friday.bootstrap.config import ApplicationSettings, load_settings
 from friday.bootstrap.logging import LoggerFactory, configure_logging
 from friday.shared.clock import Clock, SystemClock
@@ -137,6 +138,10 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     resolved_settings = load_settings() if settings is None else settings
     logger_factory = configure_logging(resolved_settings)
 
+    def event_bus_factory(current_container: ServiceContainer) -> EventBus:
+        factory = current_container.resolve(LoggerFactory)
+        return EventBus(logger=factory.get_logger("events"))
+
     container = ServiceContainer()
     container.register_instance(ApplicationSettings, resolved_settings)
     container.register_instance(LoggerFactory, logger_factory)
@@ -146,4 +151,9 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
     )
     container.register_instance(Clock, SystemClock())
     container.register_instance(IdGenerator, UuidGenerator())
+    container.register_factory(
+        EventBus,
+        event_bus_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
     return container

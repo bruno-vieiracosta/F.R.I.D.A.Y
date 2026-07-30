@@ -5,7 +5,6 @@ import pytest
 
 FORBIDDEN_IMPORTS = {
     "friday.bootstrap": {
-        "friday.application",
         "friday.domain",
         "friday.infrastructure",
     },
@@ -51,6 +50,40 @@ FORBIDDEN_MODULE_IMPORTS = {
     },
     "friday.bootstrap.container": {
         "friday.domain",
+        "friday.infrastructure",
+    },
+    "friday.application.events": {
+        "friday.bootstrap",
+        "friday.infrastructure",
+    },
+    "friday.application.event_bus": {
+        "friday.bootstrap",
+        "friday.desktop",
+        "friday.infrastructure",
+    },
+    "friday.application.persistence.repository": {
+        "friday.bootstrap",
+        "friday.desktop",
+        "friday.infrastructure",
+    },
+    "friday.application.persistence.unit_of_work": {
+        "friday.bootstrap",
+        "friday.desktop",
+        "friday.infrastructure",
+    },
+    "friday.application.persistence.transaction": {
+        "friday.bootstrap",
+        "friday.desktop",
+        "friday.infrastructure",
+    },
+    "friday.application.persistence.specifications": {
+        "friday.bootstrap",
+        "friday.desktop",
+        "friday.infrastructure",
+    },
+    "friday.application.persistence.pagination": {
+        "friday.bootstrap",
+        "friday.desktop",
         "friday.infrastructure",
     },
 }
