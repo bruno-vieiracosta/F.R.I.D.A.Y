@@ -67,6 +67,8 @@ O container de dependencias esta documentado em `docs/development/dependency_inj
 
 O barramento de eventos internos esta documentado em `docs/development/event_bus.md`.
 
+Os contratos oficiais de persistência estão documentados em `docs/development/persistence_contracts.md`.
+
 ## Estrutura
 
 ```text
