@@ -77,6 +77,8 @@ A auditoria tecnica esta documentada em `docs/development/technical_audit.md`.
 
 A infraestrutura de backup esta documentada em `docs/development/backup_infrastructure.md`.
 
+O gerenciamento de segredos esta documentado em `docs/development/secret_management.md`.
+
 ## Estrutura
 
 ```text

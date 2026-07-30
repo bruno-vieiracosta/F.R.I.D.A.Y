@@ -54,6 +54,12 @@ class DirectorySettings:
 
 
 @dataclass(frozen=True, slots=True)
+class SecretSettings:
+    file_path: Path
+    environment_prefix: str
+
+
+@dataclass(frozen=True, slots=True)
 class ApplicationSettings:
     name: str
     version: str
@@ -62,6 +68,7 @@ class ApplicationSettings:
     directories: DirectorySettings
     logging: LoggingSettings
     database_path: Path
+    secrets: SecretSettings
     feature_flags: FeatureFlags
 
     @property
@@ -73,7 +80,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> ApplicationSettin
     values = dict(os.environ if environ is None else environ)
     environment = _environment_from(values)
     debug = _bool_from(values, "FRIDAY_DEBUG", default=False)
-    directories = _directories_from(values)
+    base_dir = _base_dir_from(values)
+    directories = _directories_from(values, base_dir)
     settings = ApplicationSettings(
         name=APPLICATION_NAME,
         version=__version__,
@@ -86,6 +94,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> ApplicationSettin
             "FRIDAY_DATABASE_PATH",
             directories.data / "friday.sqlite3",
         ),
+        secrets=_secret_settings_from(values, base_dir),
         feature_flags=_feature_flags_from(values),
     )
     _validate_settings(settings)
@@ -156,13 +165,39 @@ def _log_file_name_from(values: Mapping[str, str]) -> str:
     return file_name
 
 
-def _directories_from(values: Mapping[str, str]) -> DirectorySettings:
-    base_dir = _path_from(values, "FRIDAY_BASE_DIR", Path.home() / ".friday")
+def _base_dir_from(values: Mapping[str, str]) -> Path:
+    return _path_from(values, "FRIDAY_BASE_DIR", Path.home() / ".friday")
+
+
+def _directories_from(values: Mapping[str, str], base_dir: Path) -> DirectorySettings:
     return DirectorySettings(
         data=_path_from(values, "FRIDAY_DATA_DIR", base_dir / "data"),
         logs=_path_from(values, "FRIDAY_LOGS_DIR", base_dir / "logs"),
         backups=_path_from(values, "FRIDAY_BACKUPS_DIR", base_dir / "backups"),
         temporary=_path_from(values, "FRIDAY_TEMP_DIR", base_dir / "temp"),
+    )
+
+
+def _secret_settings_from(values: Mapping[str, str], base_dir: Path) -> SecretSettings:
+    prefix = values.get("FRIDAY_SECRET_ENV_PREFIX", "FRIDAY_SECRET_").strip()
+    if not prefix:
+        raise ConfigurationError("FRIDAY_SECRET_ENV_PREFIX must not be empty.")
+
+    if any(character.isspace() for character in prefix):
+        raise ConfigurationError("FRIDAY_SECRET_ENV_PREFIX must not contain spaces.")
+
+    if "\x00" in prefix:
+        raise ConfigurationError(
+            "FRIDAY_SECRET_ENV_PREFIX must not contain null bytes."
+        )
+
+    return SecretSettings(
+        file_path=_path_from(
+            values,
+            "FRIDAY_SECRETS_FILE",
+            base_dir / "config" / "secrets.json",
+        ),
+        environment_prefix=prefix,
     )
 
 
@@ -232,6 +267,7 @@ def _validate_settings(settings: ApplicationSettings) -> None:
 
     _validate_database_path(settings.database_path)
     _validate_logging_settings(settings.logging)
+    _validate_secret_settings(settings.secrets)
 
 
 def _validate_directory_path(name: str, path: Path) -> None:
@@ -256,3 +292,14 @@ def _validate_logging_settings(settings: LoggingSettings) -> None:
 
     if settings.backup_count < 0:
         raise ConfigurationError("FRIDAY_LOG_BACKUP_COUNT must be zero or greater.")
+
+
+def _validate_secret_settings(settings: SecretSettings) -> None:
+    if settings.file_path.exists() and settings.file_path.is_dir():
+        raise ConfigurationError("FRIDAY_SECRETS_FILE must point to a file.")
+
+    parent = settings.file_path.parent
+    if parent.exists() and not parent.is_dir():
+        raise ConfigurationError(
+            "FRIDAY_SECRETS_FILE parent must point to a directory."
+        )

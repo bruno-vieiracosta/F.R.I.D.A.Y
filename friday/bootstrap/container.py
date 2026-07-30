@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging as standard_logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic, TypeVar, cast, overload
@@ -13,6 +13,8 @@ from friday.application.persistence.unit_of_work import UnitOfWork
 from friday.bootstrap.config import ApplicationSettings, load_settings
 from friday.bootstrap.logging import LoggerFactory, configure_logging
 from friday.infrastructure.audit import (
+    AuditCategory,
+    AuditLevel,
     TechnicalAuditEvent,
     TechnicalAuditEventHandler,
     TechnicalAuditRepository,
@@ -30,6 +32,13 @@ from friday.infrastructure.persistence import (
     SqlAlchemySessionFactory,
     SqlAlchemyUnitOfWork,
     resolve_database_configuration,
+)
+from friday.security.secrets import (
+    EnvironmentSecretProvider,
+    FileSecretProvider,
+    SecretProvider,
+    SecretProviderResolver,
+    build_secret_provider_resolver,
 )
 from friday.shared.clock import Clock, SystemClock
 from friday.shared.errors import ConfigurationError
@@ -245,6 +254,22 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         resolve_backup_configuration(resolved_settings),
     )
     container.register_factory(
+        EnvironmentSecretProvider,
+        lambda current_container: EnvironmentSecretProvider.from_process(
+            prefix=current_container.resolve(
+                ApplicationSettings,
+            ).secrets.environment_prefix,
+        ),
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        FileSecretProvider,
+        lambda current_container: FileSecretProvider(
+            current_container.resolve(ApplicationSettings).secrets.file_path,
+        ),
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
         SqlAlchemyEngineFactory,
         lambda current_container: SqlAlchemyEngineFactory(
             configuration=current_container.resolve(DatabaseConfiguration),
@@ -295,8 +320,44 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         lifetime=ServiceLifetime.SINGLETON,
     )
     container.register_factory(
+        SecretProviderResolver,
+        _secret_provider_resolver_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        SecretProvider,
+        lambda current_container: current_container.resolve(SecretProviderResolver),
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
         BackupService,
         backup_service_factory,
         lifetime=ServiceLifetime.SINGLETON,
     )
     return container
+
+
+def _secret_provider_resolver_factory(
+    current_container: ServiceContainer,
+) -> SecretProviderResolver:
+    def audit_callback(
+        operation: str,
+        level: str,
+        message: str,
+        metadata: Mapping[str, object] | None,
+    ) -> None:
+        current_container.resolve(TechnicalAuditService).try_record(
+            category=AuditCategory.INFRASTRUCTURE,
+            origin="secrets",
+            operation=operation,
+            level=AuditLevel(level),
+            message=message,
+            metadata=metadata,
+        )
+
+    return build_secret_provider_resolver(
+        environment_provider=current_container.resolve(EnvironmentSecretProvider),
+        file_provider=current_container.resolve(FileSecretProvider),
+        logger=current_container.resolve(LoggerFactory).get_logger("secrets"),
+        audit_callback=audit_callback,
+    )
