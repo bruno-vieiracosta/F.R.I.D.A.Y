@@ -1,22 +1,25 @@
 # Estrutura de Pacotes
 
-A F.R.I.D.A.Y. organiza sua arquitetura fisica em pacotes de responsabilidade unica. Nesta etapa, os pacotes ainda nao contem implementacoes funcionais; eles existem para estabelecer fronteiras claras para a evolucao incremental do projeto.
+A F.R.I.D.A.Y. organiza sua arquitetura fisica em pacotes de responsabilidade unica. Ao final da Fase 1, esses pacotes ja contem a fundacao tecnica oficial do projeto e preservam fronteiras claras para a evolucao incremental da aplicacao.
 
 ## Pacotes
 
-- `friday.bootstrap`: ponto de composicao da aplicacao e configuracao central. Nao deve conter regra de negocio.
-- `friday.application`: camada de orquestracao de casos de uso futuros. Pode depender de `domain` e `shared`.
+- `friday.bootstrap`: ponto de composicao da aplicacao, configuracao central, logging e container de dependencias. Nao deve conter regra de negocio.
+- `friday.application`: camada de contratos e orquestracao de casos de uso futuros. Contem o Event Bus e contratos de persistencia, sem depender da Infrastructure.
 - `friday.domain`: nucleo de regras de negocio futuras. Deve permanecer independente das demais camadas.
-- `friday.infrastructure`: adaptadores tecnicos futuros, como persistencia e recursos locais.
+- `friday.infrastructure`: adaptadores tecnicos concretos, como persistencia SQLite + SQLAlchemy, migracoes, auditoria tecnica e backup local.
 - `friday.desktop`: camada de interface desktop futura.
 - `friday.ai`: adaptadores e recursos de IA futuros.
 - `friday.integrations`: integracoes externas futuras.
-- `friday.security`: recursos futuros relacionados a seguranca da aplicacao.
-- `friday.shared`: codigo compartilhado sem regras financeiras ou dependencias de infraestrutura.
+- `friday.security`: infraestrutura transversal de seguranca, incluindo gerenciamento de segredos e hardening da plataforma.
+- `friday.shared`: codigo compartilhado, tipos fundamentais, tipos financeiros, identificadores, relogio e erros oficiais.
 
-## Fronteiras iniciais
+## Fronteiras consolidadas
 
-- `domain` nao depende de `application`, `infrastructure`, `desktop`, `ai` ou `integrations`.
-- `application` depende apenas de `domain` e `shared`.
-- `desktop`, `ai`, `infrastructure` e `integrations` deverao depender de contratos e servicos expostos por camadas internas quando forem implementados em PRs futuras.
+- `domain` nao depende de `application`, `infrastructure`, `desktop`, `ai`, `integrations` ou `security`.
+- `application` define contratos e eventos internos sem depender de `infrastructure`, `desktop`, `ai`, `integrations` ou providers concretos de seguranca.
+- `infrastructure` implementa contratos da `application` e integra recursos tecnicos concretos.
+- `bootstrap` permanece como Composition Root e registra as dependencias concretas no container oficial.
+- `security` fornece recursos transversais sem introduzir regra de negocio.
+- `desktop`, `ai` e `integrations` permanecem isolados para a Fase 2.
 - Nenhum pacote deve introduzir dependencias circulares.
