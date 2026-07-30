@@ -79,6 +79,8 @@ A infraestrutura de backup esta documentada em `docs/development/backup_infrastr
 
 O gerenciamento de segredos esta documentado em `docs/development/secret_management.md`.
 
+O hardening e seguranca da plataforma estao documentados em `docs/development/security_hardening.md`.
+
 ## Estrutura
 
 ```text

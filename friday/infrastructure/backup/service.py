@@ -32,6 +32,7 @@ from friday.infrastructure.backup.validators import (
     validate_backup as validate_backup_structure,
 )
 from friday.infrastructure.persistence import DatabaseInfrastructure
+from friday.security.hardening import HardenedPathPurpose, SecureFilesystem
 from friday.shared.clock import Clock
 from friday.shared.errors import FridayError, InfrastructureError, PersistenceError
 from friday.shared.identifiers import EntityId, IdGenerator
@@ -47,6 +48,7 @@ class BackupService:
     logger: standard_logging.Logger
     audit_service: TechnicalAuditService
     event_bus: EventBus
+    secure_filesystem: SecureFilesystem | None = None
 
     def create_backup(self) -> BackupManifest:
         try:
@@ -71,7 +73,7 @@ class BackupService:
         return manifest
 
     def list_backups(self) -> tuple[BackupManifest, ...]:
-        ensure_backup_directory(self.configuration)
+        self._ensure_backup_directory()
         manifests = [
             self._validate_backup_structure(path)
             for path in sorted(self.configuration.directory.iterdir())
@@ -115,7 +117,7 @@ class BackupService:
         temporary_destination = destination.with_suffix(f"{destination.suffix}.restore")
 
         try:
-            destination.parent.mkdir(parents=True, exist_ok=True)
+            self._ensure_directory(destination.parent)
             self.database.engine.dispose()
             shutil.copy2(source, temporary_destination)
             temporary_destination.replace(destination)
@@ -140,7 +142,14 @@ class BackupService:
     def remove_backup(self, backup_path: Path) -> BackupManifest:
         manifest = self._validate_backup_structure(backup_path)
         try:
-            shutil.rmtree(backup_path)
+            if self.secure_filesystem is None:
+                shutil.rmtree(backup_path)
+            else:
+                self.secure_filesystem.remove_tree(
+                    self.configuration.directory,
+                    Path(backup_path.name),
+                    purpose=HardenedPathPurpose.BACKUP,
+                )
         except OSError as error:
             wrapped = InfrastructureError(
                 "Backup could not be removed.",
@@ -157,7 +166,7 @@ class BackupService:
         return manifest
 
     def _create_backup(self) -> BackupManifest:
-        ensure_backup_directory(self.configuration)
+        self._ensure_backup_directory()
         database_path = self.database.configuration.path
         if not database_path.is_file():
             raise InfrastructureError(
@@ -178,12 +187,14 @@ class BackupService:
             )
 
         try:
-            backup_path.mkdir(parents=True)
-            (backup_path / self.configuration.metadata_directory_name).mkdir()
-            (backup_path / self.configuration.logs_directory_name).mkdir()
+            self._ensure_directory(backup_path)
+            self._ensure_directory(
+                backup_path / self.configuration.metadata_directory_name
+            )
+            self._ensure_directory(backup_path / self.configuration.logs_directory_name)
             schema_version = self._schema_version()
             self.database.engine.dispose()
-            shutil.copy2(database_path, backup_path / self.configuration.database_name)
+            self._copy_database(database_path, backup_path)
             files = (
                 build_file_manifest(backup_path, self.configuration.database_name),
             )
@@ -236,6 +247,15 @@ class BackupService:
 
     def _write_manifest(self, backup_path: Path, manifest: BackupManifest) -> None:
         manifest_path = backup_path / self.configuration.manifest_name
+        if self.secure_filesystem is not None:
+            self.secure_filesystem.atomic_write_text(
+                backup_path,
+                Path(self.configuration.manifest_name),
+                f"{manifest.to_json()}\n",
+                purpose=HardenedPathPurpose.BACKUP,
+            )
+            return
+
         temporary_path = manifest_path.with_suffix(".json.tmp")
         temporary_path.write_text(f"{manifest.to_json()}\n", encoding="utf-8")
         temporary_path.replace(manifest_path)
@@ -256,7 +276,14 @@ class BackupService:
         for manifest in manifests[self.configuration.max_backups :]:
             backup_path = self._backup_path(manifest)
             try:
-                shutil.rmtree(backup_path)
+                if self.secure_filesystem is None:
+                    shutil.rmtree(backup_path)
+                else:
+                    self.secure_filesystem.remove_tree(
+                        self.configuration.directory,
+                        Path(backup_path.name),
+                        purpose=HardenedPathPurpose.BACKUP,
+                    )
             except OSError as error:
                 self.logger.error(
                     "Backup retention cleanup failed",
@@ -316,3 +343,38 @@ class BackupService:
                 extra={"backup_error": error.to_log_dict()},
                 exc_info=(type(error), error, error.__traceback__),
             )
+
+    def _ensure_backup_directory(self) -> None:
+        if self.secure_filesystem is None:
+            ensure_backup_directory(self.configuration)
+            return
+
+        self.secure_filesystem.ensure_directory(
+            self.configuration.directory,
+            Path("."),
+            purpose=HardenedPathPurpose.BACKUP,
+        )
+
+    def _ensure_directory(self, path: Path) -> None:
+        if self.secure_filesystem is None:
+            path.mkdir(parents=True, exist_ok=True)
+            return
+
+        self.secure_filesystem.ensure_directory(
+            path,
+            Path("."),
+            purpose=HardenedPathPurpose.BACKUP,
+        )
+
+    def _copy_database(self, database_path: Path, backup_path: Path) -> None:
+        if self.secure_filesystem is None:
+            shutil.copy2(database_path, backup_path / self.configuration.database_name)
+            return
+
+        self.secure_filesystem.copy_file(
+            database_path.parent,
+            Path(database_path.name),
+            backup_path,
+            Path(self.configuration.database_name),
+            purpose=HardenedPathPurpose.BACKUP,
+        )

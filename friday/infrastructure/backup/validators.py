@@ -5,6 +5,8 @@ from pathlib import Path
 
 from friday.infrastructure.backup.configuration import BackupConfiguration
 from friday.infrastructure.backup.manifest import BackupFile, BackupManifest
+from friday.security.hardening import HardenedPathPurpose, resolve_within_root
+from friday.security.hardening.exceptions import HardeningError
 from friday.shared.errors import InfrastructureError, ValidationError
 
 
@@ -84,21 +86,23 @@ def _validate_backup_path(
     backup_path: Path,
     configuration: BackupConfiguration,
 ) -> Path:
-    resolved_directory = configuration.directory.resolve(strict=False)
-    resolved_path = backup_path.resolve(strict=False)
-
     try:
-        resolved_path.relative_to(resolved_directory)
-    except ValueError as error:
+        hardened_path = resolve_within_root(
+            configuration.directory,
+            backup_path,
+            purpose=HardenedPathPurpose.BACKUP,
+        )
+    except HardeningError as error:
         raise ValidationError(
             "Backup path is invalid.",
             technical_message="Backup path must be inside the configured directory.",
             metadata={
-                "path": str(resolved_path),
-                "backup_directory": str(resolved_directory),
+                "path": backup_path.name,
+                "backup_directory": configuration.directory.name,
             },
         ) from error
 
+    resolved_path = hardened_path.path
     if not resolved_path.exists():
         raise ValidationError(
             "Backup path is invalid.",

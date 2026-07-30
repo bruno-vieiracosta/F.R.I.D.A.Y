@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
+from friday.security.hardening import HardenedPathPurpose, SecureFilesystem
+from friday.security.hardening.exceptions import HardeningError
 from friday.security.secrets.exceptions import (
     SecretConfigurationError,
     SecretNotFoundError,
@@ -17,6 +19,7 @@ from friday.security.secrets.models import Secret, SecretIdentifier, SecretSourc
 @dataclass(frozen=True, slots=True)
 class FileSecretProvider:
     path: Path
+    secure_filesystem: SecureFilesystem | None = None
 
     @property
     def source(self) -> SecretSource:
@@ -44,13 +47,27 @@ class FileSecretProvider:
     def _load(self) -> Mapping[str, str]:
         path = self.path.expanduser()
         try:
-            raw_content = path.read_text(encoding="utf-8")
+            if self.secure_filesystem is None:
+                raw_content = path.read_text(encoding="utf-8")
+            else:
+                raw_content = self.secure_filesystem.read_text(
+                    path.parent,
+                    Path(path.name),
+                    purpose=HardenedPathPurpose.SECRET,
+                )
         except FileNotFoundError as error:
             raise SecretProviderUnavailableError(
                 "Secret file is not available.",
                 technical_message="Configured secret file does not exist.",
                 cause=error,
                 metadata={"path": str(path)},
+            ) from error
+        except HardeningError as error:
+            raise SecretProviderUnavailableError(
+                "Secret file is not available.",
+                technical_message="Configured secret file was rejected by hardening.",
+                cause=error,
+                metadata={"path": path.name},
             ) from error
         except OSError as error:
             raise SecretProviderUnavailableError(

@@ -33,6 +33,11 @@ from friday.infrastructure.persistence import (
     SqlAlchemyUnitOfWork,
     resolve_database_configuration,
 )
+from friday.security.hardening import (
+    SecureFilesystem,
+    SecurityPolicy,
+    build_default_security_policy,
+)
 from friday.security.secrets import (
     EnvironmentSecretProvider,
     FileSecretProvider,
@@ -234,6 +239,7 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
             logger=current_container.resolve(LoggerFactory).get_logger("backup"),
             audit_service=current_container.resolve(TechnicalAuditService),
             event_bus=current_container.resolve(EventBus),
+            secure_filesystem=current_container.resolve(SecureFilesystem),
         )
 
     container = ServiceContainer()
@@ -254,6 +260,16 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         resolve_backup_configuration(resolved_settings),
     )
     container.register_factory(
+        SecurityPolicy,
+        _security_policy_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
+        SecureFilesystem,
+        _secure_filesystem_factory,
+        lifetime=ServiceLifetime.SINGLETON,
+    )
+    container.register_factory(
         EnvironmentSecretProvider,
         lambda current_container: EnvironmentSecretProvider.from_process(
             prefix=current_container.resolve(
@@ -266,6 +282,7 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         FileSecretProvider,
         lambda current_container: FileSecretProvider(
             current_container.resolve(ApplicationSettings).secrets.file_path,
+            secure_filesystem=current_container.resolve(SecureFilesystem),
         ),
         lifetime=ServiceLifetime.SINGLETON,
     )
@@ -335,6 +352,41 @@ def build_container(settings: ApplicationSettings | None = None) -> ServiceConta
         lifetime=ServiceLifetime.SINGLETON,
     )
     return container
+
+
+def _security_policy_factory(current_container: ServiceContainer) -> SecurityPolicy:
+    settings = current_container.resolve(ApplicationSettings)
+    return build_default_security_policy(
+        data_directory=settings.directories.data,
+        logs_directory=settings.directories.logs,
+        backups_directory=settings.directories.backups,
+        temporary_directory=settings.directories.temporary,
+        database_path=settings.database_path,
+        secrets_file_path=settings.secrets.file_path,
+    )
+
+
+def _secure_filesystem_factory(current_container: ServiceContainer) -> SecureFilesystem:
+    def audit_callback(
+        operation: str,
+        level: str,
+        message: str,
+        metadata: Mapping[str, object] | None,
+    ) -> None:
+        current_container.resolve(TechnicalAuditService).try_record(
+            category=AuditCategory.INFRASTRUCTURE,
+            origin="hardening",
+            operation=operation,
+            level=AuditLevel(level),
+            message=message,
+            metadata=metadata,
+        )
+
+    return SecureFilesystem(
+        policy=current_container.resolve(SecurityPolicy),
+        logger=current_container.resolve(LoggerFactory).get_logger("hardening"),
+        audit_callback=audit_callback,
+    )
 
 
 def _secret_provider_resolver_factory(
